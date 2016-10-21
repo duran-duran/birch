@@ -44,6 +44,7 @@ void CF_Node::insert(const CF_Cluster &entry)
         if (node->getSubclusters().size() > bFactor)
         {
             auto newClusters = node->splitNode();
+            delete closest->child;
             subclusters.erase(closest);
             subclusters.insert(subclusters.end(), newClusters.begin(), newClusters.end());
         }
