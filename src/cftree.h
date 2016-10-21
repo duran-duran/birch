@@ -2,46 +2,33 @@
 #define __CFTREE_H__
 
 #include "common.h"
-#include <list>
-
-data_t euclideanDistance(const DataPoint &a, const DataPoint &b);
-
-class CF_Subcluster
-{
-public:
-    long N;
-    DataPoint LS;
-    data_t SS;
-
-    DataPoint centroid;
-    data_t radius, diameter;
-
-    CF_Node* child;
-
-    CF_Subcluster(int dim);
-    bool add(const DataPoint& entry);
-    data_t distanceTo(const DataPoint& entry);
-    data_t distanceTo(const CF_Subcluster& entry);
-};
-
-using CF_Vector = std::list<CF_Subcluster>;
-using CF_Vector_it = CF_Vector::iterator;
+#include "cfcluster.h"
 
 class CF_Node
 {
 public:
-    bool leaf;
-    CF_Vector subclusters;
+    CF_Node(data_t threshold, size_t branching);
+    CF_Node(data_t threshold, size_t branching, bool isLeaf, const CF_Vector& subclusters);
 
+    const CF_Vector& getSubclusters();
+
+    void setPrevLeaf(CF_Node *leaf);
+    void setNextLeaf(CF_Node *leaf);
+
+    CF_Node *getPrevLeaf();
+    CF_Node *getNextLeaf();
+
+    void insert(const CF_Cluster& entry);
+    CF_Vector splitNode();
+
+private:
+    data_t threshold;
+    size_t bFactor;
+
+    bool leaf, root;
     CF_Node *prevLeaf, *nextLeaf;
 
-    data_t threshold;
-    int bFactor;
-
-    CF_Node(data_t threshold, int branching);
-    void insert(const DataPoint& entry);
-    CF_Vector_it findClosest(const DataPoint& entry);
-    std::pair<CF_Subcluster, CF_Subcluster> splitNode();
+    CF_Vector subclusters;
 };
 
 #endif // __CFTREE_H__

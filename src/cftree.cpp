@@ -1,121 +1,139 @@
 #include "cftree.h"
-#include <limits>
-#include <cmath>
-#include <utility>
+#include "metrics.h"
 
-CF_Node::CF_Node(data_t threshold, int branching) :
+CF_Node::CF_Node(data_t threshold, size_t branching) :
     threshold(threshold),
     bFactor(branching),
     leaf(true),
+    root(true),
     prevLeaf(nullptr),
     nextLeaf(nullptr)
 {
-
 }
 
-void CF_Node::insert(const DataPoint &entry)
+CF_Node::CF_Node(data_t threshold, size_t branching, bool isLeaf, const CF_Vector &subclusters) :
+    threshold(threshold),
+    bFactor(branching),
+    leaf(isLeaf),
+    root(false),
+    prevLeaf(nullptr),
+    nextLeaf(nullptr),
+    subclusters(subclusters)
 {
-    if (!leaf)
+}
+
+void CF_Node::insert(const CF_Cluster &entry)
+{
+    auto closest = entry.findClosest(subclusters);
+    if (closest == subclusters.end())
     {
-        auto closest = findClosest(entry);
-        closest.add(entry);
-        closest.child->insert(entry);
+        subclusters.push_back(entry);
+        return;
+    }
+
+    closest->add(entry);
+    if (leaf && closest->D > threshold)
+    {
+        closest->remove(entry);
+        subclusters.push_back(entry);
     }
     else
     {
-        if (subclusters.empty() || !findClosest(entry).add(entry))
-            auto newSubcluster = CF_Subcluster(entry.size());
-    }
-
-    if (subclusters.size() > bFactor)
-        splitNode();
-}
-
-CF_Vector_it CF_Node::findClosest(const DataPoint &entry)
-{
-    auto closest = subclusters.begin();
-
-    data_t shortestDist;
-
-    if (closest != subclusters.end())
-    {
-        shortestDist = closest->distanceTo(entry);
-        for (auto it = closest + 1; it != subclusters.end(); ++it)
+        auto node = closest->child;
+        node->insert(entry);
+        if (node->getSubclusters().size() > bFactor)
         {
-            auto distance = it->distanceTo(entry);
-            if (distance < shortestDist)
-            {
-                closest = it;
-                shortestDist = distance;
-            }
+            auto newClusters = node->splitNode();
+            subclusters.erase(closest);
+            subclusters.insert(subclusters.end(), newClusters.begin(), newClusters.end());
         }
     }
 
-    return closest;
+    if (root && subclusters.size() > bFactor)
+    {
+        subclusters = splitNode();
+        leaf = false;
+    }
 }
 
-std::pair<CF_Vector_it, CF_Vector_it> CF_Node::splitNode()
+CF_Vector CF_Node::splitNode()
 {
-    data_t longestDist = 0;
-    CF_Subcluster firstPole, secondPole;
+    if (subclusters.size() < 2)
+        return (root) ? subclusters : CF_Vector{CF_Cluster(this)};
 
-    for (auto lhs = subclusters.begin(); lhs != subclusters.end() - 1; ++lhs)
+    CF_Vector_it pole1 = subclusters.begin(),
+                 pole2 = pole1 + 1;
+    data_t longestDist = getDistance(*pole1, *pole2);
+
+    for (auto lhs = pole1; lhs != subclusters.end() - 1; ++lhs)
     {
-        for (auto rhs = lhs + 1; rhs != subclusters.end(); ++rhs)
+        for (auto rhs = pole2 + 1; rhs != subclusters.end(); ++rhs)
         {
-            auto distance = lhs->distanceTo(*rhs);
+            auto distance = getDistance(*lhs, *rhs);
             if (distance > longestDist)
             {
                 longestDist = distance;
-                firstPole = *lhs;
-                secondPole = *rhs;
+                pole1 = lhs;
+                pole2 = rhs;
             }
         }
     }
 
-    CF_Vector firstPoleClusters, secondPoleClusters;
-    firstPoleClusters.push_back(firstPole);
-    secondPoleClusters.push_back(secondPole);
-    subclusters.erase(firstPole);
-    subclusters.erase(secondPole);
+    CF_Vector subclusters1{*pole1},
+              subclusters2{*pole2};
 
     for (auto it = subclusters.begin(); it != subclusters.end(); ++it)
     {
-        if (firstPole.distanceTo(*it) < secondPole.distanceTo(*it))
-            firstPoleClusters.push_back(*it);
-        else
-            secondPoleClusters.push_back(*it);
+        if (it != pole1 && it != pole2)
+        {
+            if (getDistance(*it, *pole1) < getDistance(*it, *pole2))
+                subclusters1.push_back(*it);
+            else
+                subclusters2.push_back(*it);
+        }
     }
 
-    return std::make_pair(
-                CF_Subcluster()
-                )
-    //find two farthest subclasters
+    CF_Node *node1 = new CF_Node(threshold, bFactor, leaf, subclusters1),
+            *node2 = new CF_Node(threshold, bFactor, leaf, subclusters2);
+
+    if (leaf)
+    {
+        node1->setPrevLeaf(prevLeaf);
+        node1->setNextLeaf(node2);
+
+        node2->setPrevLeaf(node1);
+        node2->setNextLeaf(nextLeaf);
+    }
+
+    CF_Cluster cluster1(node1),
+               cluster2(node2);
+
+    return CF_Vector{cluster1, cluster2};
 }
 
-CF_Subcluster::CF_Subcluster(int dim) :
-    N(0), LS(0, dim), SS(0),
-    centroid(0, dim),
-    radius(0), diameter(0),
-    child(nullptr)
+const CF_Vector &CF_Node::getSubclusters()
 {
+    return subclusters;
 }
 
-data_t CF_Subcluster::distanceTo(const DataPoint &entry)
+void CF_Node::setPrevLeaf(CF_Node *leaf)
 {
-    return euclideanDistance(entry, centroid);
+    prevLeaf = leaf;
 }
 
-data_t CF_Subcluster::distanceTo(const CF_Subcluster &entry)
+void CF_Node::setNextLeaf(CF_Node *leaf)
 {
-    return entry.distanceTo(centroid);
+    nextLeaf = leaf;
 }
 
-data_t euclideanDistance(const DataPoint &a, const DataPoint &b)
+CF_Node *CF_Node::getPrevLeaf()
 {
-    data_t sum = 0;
-    for (size_t i = 0; i < a.size(); ++i)
-        sum += pow(a[i] - b[i], 2);
-    return sqrt(sum);
+    return prevLeaf;
 }
+
+CF_Node *CF_Node::getNextLeaf()
+{
+    return nextLeaf;
+}
+
 
