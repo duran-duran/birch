@@ -1,20 +1,19 @@
-#include <stdio.h>
-#include <cstdlib>
-#include <iostream>
-#include <mpi.h>
+#include "common.h"
+
+
 
 int main(int argc, char *argv[])
 {
     MPI_Init(&argc, &argv);
 
-    int rank, size;
+    int rank, procs;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_size(MPI_COMM_WORLD, &procs);
 
     long count;
     int dim;
-    double *data, *buff = nullptr;
+    data_t *data, *buff = nullptr;
     char *filename;
     FILE *pfile;
 
@@ -28,8 +27,8 @@ int main(int argc, char *argv[])
         filename = argv[1];
 
         pfile = fopen(filename, "rb");
-        fread((void*)&count, sizeof(count), 1, pfile);
-        fread((void*)&dim, sizeof(dim), 1, pfile);
+        fread(&count, sizeof(count), 1, pfile);
+        fread(&dim, sizeof(dim), 1, pfile);
 
 
 
@@ -37,15 +36,20 @@ int main(int argc, char *argv[])
     }
 
     MPI_Bcast(&dim, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Datatype DATA_POINT;
+    MPI_Type_contiguous(dim, MPI_DATA_T, &DATA_POINT);
+    MPI_Type_commit(&DATA_POINT);
+    const int point_size = sizeof(data_t) * dim;
+
     std::cout << "Process " << rank << ": dim = " << dim << std::endl;
 
     int chunk, *chunks;
     if (rank == 0)
     {
-        chunks = (int*) malloc(size * sizeof(int));
-        for (int r = 0; r < size; ++r)
+        chunks = (int*) malloc(procs * sizeof(int));
+        for (int r = 0; r < procs; ++r)
         {
-            chunks[r] = (int) ((r + 1) * ((double) count / size)) -  (int) (r * ((double) count / size));
+            chunks[r] = (int) ((r + 1) * ((double) count / procs)) -  (int) (r * ((double) count / procs));
             std::cout << "Chunk " << r << ": " << chunks[r] << std::endl;
         }
     }
@@ -54,18 +58,18 @@ int main(int argc, char *argv[])
                 &chunk, 1, MPI_INT,
                 0, MPI_COMM_WORLD);
 
-    data = (double*) malloc(dim * chunk * sizeof(double));
+    data = (data_t*) malloc(chunk * point_size);
 
     std::cout << "Process " << rank << ": I'll take " << chunk << " data points" << std::endl;
     if (rank == 0)
     {
-        fread(data, dim * sizeof(double), chunk, pfile);
-        for (int r = 1; r < size; ++r)
+        fread(data, point_size, chunk, pfile);
+        for (int r = 1; r < procs; ++r)
         {
-            buff = (double*)malloc(dim * chunks[r] * sizeof(double));
-            fread(buff, dim * sizeof(double), chunks[r], pfile);
-            MPI_Send(buff, dim * chunks[r], MPI_DOUBLE, r, 0, MPI_COMM_WORLD);
-            free(buff);
+            buff = (data_t*)realloc(buff, chunks[r] * point_size);
+            fread(buff, point_size, chunks[r], pfile);
+            MPI_Send(buff, chunks[r], DATA_POINT, r, 0, MPI_COMM_WORLD);
+//            free(buff);
         }
 //        free(buff);
         free(chunks);
@@ -73,10 +77,10 @@ int main(int argc, char *argv[])
     }
     else
     {
-        MPI_Recv(data, dim * chunk, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(data, chunk, DATA_POINT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
-    for (int r = 0; r < size; ++r)
+    for (int r = 0; r < procs; ++r)
     {
         if (rank == r)
         {
@@ -110,6 +114,7 @@ int main(int argc, char *argv[])
 //    free(chunks);
     free(data);
 
+    MPI_Type_free(&DATA_POINT);
     MPI_Finalize();
 
     return 0;

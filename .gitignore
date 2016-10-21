@@ -10,3 +10,4 @@ build/
 *.files
 *.config
 *.includes
+*.creator.user
