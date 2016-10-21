@@ -1,6 +1,16 @@
 #include "common.h"
+#include "mpi.h"
+#include <vector>
+#include <iostream>
 
-
+void gotDataPoint(int rank, const DataPoint& point)
+{
+    std::cout << "Process " << rank << ": got data point:";
+    for (size_t i = 0; i < point.size(); ++i) {
+        std::cout << " " << point[i];
+    }
+    std::cout << std::endl;
+}
 
 int main(int argc, char *argv[])
 {
@@ -13,7 +23,6 @@ int main(int argc, char *argv[])
 
     long count;
     int dim;
-    data_t *data, *buff = nullptr;
     char *filename;
     FILE *pfile;
 
@@ -30,8 +39,6 @@ int main(int argc, char *argv[])
         fread(&count, sizeof(count), 1, pfile);
         fread(&dim, sizeof(dim), 1, pfile);
 
-
-
         std::cout << "Reading " << count << " " << dim << "-dimensional data points" << std::endl;
     }
 
@@ -43,76 +50,67 @@ int main(int argc, char *argv[])
 
     std::cout << "Process " << rank << ": dim = " << dim << std::endl;
 
-    int chunk, *chunks;
+    std::vector<int> chunks(procs);
     if (rank == 0)
     {
-        chunks = (int*) malloc(procs * sizeof(int));
         for (int r = 0; r < procs; ++r)
         {
-            chunks[r] = (int) ((r + 1) * ((double) count / procs)) -  (int) (r * ((double) count / procs));
+            chunks[r] = (r < count % procs) ? count / procs + 1 : count / procs;
             std::cout << "Chunk " << r << ": " << chunks[r] << std::endl;
         }
     }
 
-    MPI_Scatter(chunks, 1, MPI_INT,
+    int chunk;
+    MPI_Scatter(&chunks[0], 1, MPI_INT,
                 &chunk, 1, MPI_INT,
                 0, MPI_COMM_WORLD);
-
-    data = (data_t*) malloc(chunk * point_size);
+    chunks.clear();
 
     std::cout << "Process " << rank << ": I'll take " << chunk << " data points" << std::endl;
     if (rank == 0)
     {
-        fread(data, point_size, chunk, pfile);
-        for (int r = 1; r < procs; ++r)
+        std::vector<DataPoint> buff(procs, DataPoint(dim));
+        std::vector<MPI_Request> requests(procs - 1);
+        size_t reqCount = 0;
+        for (int i = 0, r = 0; i < count; ++i, ++r)
         {
-            buff = (data_t*)realloc(buff, chunks[r] * point_size);
-            fread(buff, point_size, chunks[r], pfile);
-            MPI_Send(buff, chunks[r], DATA_POINT, r, 0, MPI_COMM_WORLD);
-//            free(buff);
+            if (r == procs)
+            {
+                MPI_Waitall(reqCount, &requests[0], MPI_STATUSES_IGNORE);
+                r = reqCount = 0;
+            };
+            std::cout << "Reading " << i + 1 << "th point.." << std::endl;
+            fread(&buff[r][0], point_size, 1, pfile);
+            if (r == 0)
+            {
+                DataPoint dataPoint(&buff[r][0], dim);
+                gotDataPoint(rank, dataPoint);
+            }
+            else if (r < procs)
+            {
+                std::cout << "Process 0: sending data point to process " << r << std::endl;
+                MPI_Isend(&buff[r][0], 1, DATA_POINT, r, 0, MPI_COMM_WORLD, &requests[r - 1]);
+                ++reqCount;
+            }
         }
-//        free(buff);
-        free(chunks);
+
+        if (reqCount > 0)
+        {
+            MPI_Waitall(reqCount, &requests[0], MPI_STATUSES_IGNORE);
+        }
         fclose(pfile);
+        buff.clear();
+        requests.clear();
     }
     else
     {
-        MPI_Recv(data, chunk, DATA_POINT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
-
-    for (int r = 0; r < procs; ++r)
-    {
-        if (rank == r)
+        DataPoint dataPoint(dim);
+        for (int i = 0; i < chunk; ++i)
         {
-            for (int k = 0; k < chunk; ++k) {
-                std::cout << "Process " << rank << ": got data point:";
-                for (int i = 0; i < dim; ++i) {
-                    std::cout << " " << data[k * dim + i];
-                }
-                std::cout << std::endl;
-            }
+            MPI_Recv(&dataPoint[0], 1, DATA_POINT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            gotDataPoint(rank, dataPoint);
         }
-        MPI_Barrier(MPI_COMM_WORLD);
     }
-//        free(chunks);
-//    {
-//        free(chunks);
-//        double *data = (double*) malloc(count * dim * sizeof(double));
-
-//        for (long k = 0; k < count; ++k) {
-//            std::cout << "Data point:";
-//            for (int i = 0; i < dim; ++i) {
-//                fread((void*)(data + k * dim + i), sizeof(double), 1, pfile);
-//                std::cout << " " << data[k * dim + i];
-//            }
-//            std::cout << std::endl;
-//        }
-
-//        fclose(pfile);
-
-//    }
-//    free(chunks);
-    free(data);
 
     MPI_Type_free(&DATA_POINT);
     MPI_Finalize();

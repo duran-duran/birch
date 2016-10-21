@@ -10,7 +10,7 @@
 
 using data_t = double;
 #define MPI_DATA_T MPI_DOUBLE
-using data_point = std::valarray<double>;
+using DataPoint = std::valarray<data_t>;
 
 #endif // __COMMON_H__
 

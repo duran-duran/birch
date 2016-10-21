@@ -4,23 +4,23 @@
 #include "common.h"
 #include <list>
 
-data_t euclideanDistance(const data_point &a, const data_point &b);
+data_t euclideanDistance(const DataPoint &a, const DataPoint &b);
 
 class CF_Subcluster
 {
 public:
     long N;
-    data_point LS;
+    DataPoint LS;
     data_t SS;
 
-    data_point centroid;
+    DataPoint centroid;
     data_t radius, diameter;
 
     CF_Node* child;
 
     CF_Subcluster(int dim);
-    bool add(const data_point& entry);
-    data_t distanceTo(const data_point& entry);
+    bool add(const DataPoint& entry);
+    data_t distanceTo(const DataPoint& entry);
     data_t distanceTo(const CF_Subcluster& entry);
 };
 
@@ -39,8 +39,8 @@ public:
     int bFactor;
 
     CF_Node(data_t threshold, int branching);
-    void insert(const data_point& entry);
-    CF_Vector_it findClosest(const data_point& entry);
+    void insert(const DataPoint& entry);
+    CF_Vector_it findClosest(const DataPoint& entry);
     std::pair<CF_Subcluster, CF_Subcluster> splitNode();
 };
 

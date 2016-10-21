@@ -13,7 +13,7 @@ CF_Node::CF_Node(data_t threshold, int branching) :
 
 }
 
-void CF_Node::insert(const data_point &entry)
+void CF_Node::insert(const DataPoint &entry)
 {
     if (!leaf)
     {
@@ -31,7 +31,7 @@ void CF_Node::insert(const data_point &entry)
         splitNode();
 }
 
-CF_Vector_it CF_Node::findClosest(const data_point &entry)
+CF_Vector_it CF_Node::findClosest(const DataPoint &entry)
 {
     auto closest = subclusters.begin();
 
@@ -101,7 +101,7 @@ CF_Subcluster::CF_Subcluster(int dim) :
 {
 }
 
-data_t CF_Subcluster::distanceTo(const data_point &entry)
+data_t CF_Subcluster::distanceTo(const DataPoint &entry)
 {
     return euclideanDistance(entry, centroid);
 }
@@ -111,7 +111,7 @@ data_t CF_Subcluster::distanceTo(const CF_Subcluster &entry)
     return entry.distanceTo(centroid);
 }
 
-data_t euclideanDistance(const data_point &a, const data_point &b)
+data_t euclideanDistance(const DataPoint &a, const DataPoint &b)
 {
     data_t sum = 0;
     for (size_t i = 0; i < a.size(); ++i)
