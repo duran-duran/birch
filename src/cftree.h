@@ -12,6 +12,8 @@ public:
 
     const CF_Vector& getSubclusters();
 
+    bool isLeaf();
+
     void setPrevLeaf(CF_Node *leaf);
     void setNextLeaf(CF_Node *leaf);
 
@@ -20,6 +22,8 @@ public:
 
     void insert(const CF_Cluster& entry);
     CF_Vector splitNode();
+
+    void clear();
 
 private:
     data_t threshold;

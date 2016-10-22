@@ -3,6 +3,8 @@
 #include <vector>
 #include <iostream>
 
+#define MPI_DATA_T MPI_DOUBLE
+
 void gotDataPoint(int rank, const DataPoint& point)
 {
     std::cout << "Process " << rank << ": got data point:";
