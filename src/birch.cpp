@@ -12,7 +12,7 @@ int rank = 0,
 MPI_Datatype DATA_POINT;
 
 std::string prelog() {
-    return "Process " + std::to_string(rank) + (rank == 0 ? " (Root)" : "") + ": ";
+    return "Process " + std::to_string((long long)rank) + (rank == 0 ? " (Root)" : "") + ": ";
 }
 
 void gotDataPoint(int rank, const DataPoint& point) {
