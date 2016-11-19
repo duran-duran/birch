@@ -25,11 +25,6 @@ public:
 
     void clear();
 
-    std::vector<CF_Node*> getAllLeafNodes();
-    CF_Vector getAllLeafEntries();
-    data_t getMaxLeafEntryDiameter();
-    data_t getMinNewThreshold();
-
 private:
     data_t threshold;
     size_t bFactor;
