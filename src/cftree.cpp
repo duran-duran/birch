@@ -1,9 +1,10 @@
 #include "cftree.h"
 #include "metrics.h"
 
-CF_Node::CF_Node(data_t threshold, size_t branching) :
+CF_Node::CF_Node(data_t threshold, size_t branching, size_t *entriesCount) :
     threshold(threshold),
     bFactor(branching),
+    counter(entriesCount),
     leaf(true),
     root(true),
     prevLeaf(nullptr),
@@ -11,9 +12,10 @@ CF_Node::CF_Node(data_t threshold, size_t branching) :
 {
 }
 
-CF_Node::CF_Node(data_t threshold, size_t branching, bool isLeaf, const CF_Vector &subclusters) :
+CF_Node::CF_Node(data_t threshold, size_t branching, size_t *entriesCount, bool isLeaf, const CF_Vector &subclusters) :
     threshold(threshold),
     bFactor(branching),
+    counter(entriesCount),
     leaf(isLeaf),
     root(false),
     prevLeaf(nullptr),
@@ -28,6 +30,7 @@ void CF_Node::insert(const CF_Cluster &entry)
     if (closest == subclusters.end())
     {
         subclusters.push_back(entry);
+        if (counter) ++*counter;
         return;
     }
 
@@ -38,6 +41,7 @@ void CF_Node::insert(const CF_Cluster &entry)
         {
             closest->remove(entry);
             subclusters.push_back(entry);
+            if (counter) ++*counter;
         }
     }
     else
@@ -92,8 +96,8 @@ CF_Vector CF_Node::splitNode()
             subclusters2.push_back(*it);
     }
 
-    CF_Node *node1 = new CF_Node(threshold, bFactor, leaf, subclusters1),
-            *node2 = new CF_Node(threshold, bFactor, leaf, subclusters2);
+    CF_Node *node1 = new CF_Node(threshold, bFactor, counter, leaf, subclusters1),
+            *node2 = new CF_Node(threshold, bFactor, counter, leaf, subclusters2);
 
     if (leaf)
     {
@@ -117,6 +121,73 @@ CF_Vector CF_Node::splitNode()
                cluster2(node2);
 
     return CF_Vector{cluster1, cluster2};
+}
+
+std::vector<CF_Node*> CF_Node::getAllLeafNodes()
+{
+    std::vector<CF_Node*> result;
+    auto node = this;
+
+    while (!node->isLeaf())
+        node = node->getSubclusters().front().child;
+    result.push_back(node);
+    for (CF_Node *left = node->getPrevLeaf(); left != nullptr; left = left->getPrevLeaf())
+        result.push_back(left);
+    for (CF_Node *right = node->getNextLeaf(); right != nullptr; right = right->getNextLeaf())
+        result.push_back(right);
+    return result;
+}
+
+CF_Vector CF_Node::getAllLeafEntries()
+{
+    CF_Vector result;
+    auto leafNodes = getAllLeafNodes();
+    for (auto node : leafNodes)
+        result.insert(result.end(), node->getSubclusters().begin(), node->getSubclusters().end());
+    return result;
+}
+
+data_t CF_Node::getMaxLeafEntryDiameter()
+{
+    auto leafEntries = getAllLeafEntries();
+    data_t max = 0;
+    for (const auto& entry : leafEntries)
+    {
+        if (entry.D > max)
+            max = entry.D;
+    }
+    return max;
+}
+
+data_t CF_Node::getMinNewThreshold()
+{
+    auto node = this;
+    while (!node->isLeaf())
+    {
+        long maxN = 0;
+        for (const auto& entry : node->getSubclusters())
+        {
+            if (entry.N > maxN)
+                node = entry.child;
+        }
+    }
+
+    auto leafEntries = node->getSubclusters();
+
+    if (leafEntries.size() < 2)
+        return 0;
+
+    data_t closestDist = getDistance(*leafEntries.begin(), *(leafEntries.begin() + 1));
+    for (auto lhs = leafEntries.begin(); lhs != leafEntries.end() - 1; ++lhs)
+    {
+        for (auto rhs = lhs + 1; rhs != leafEntries.end(); ++rhs)
+        {
+            auto distance = getDistance(*lhs, *rhs);
+            if (distance < closestDist)
+                closestDist = distance;
+        }
+    }
+    return closestDist;
 }
 
 void CF_Node::clear()
@@ -161,5 +232,3 @@ CF_Node *CF_Node::getNextLeaf()
 {
     return nextLeaf;
 }
-
-

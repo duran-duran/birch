@@ -3,7 +3,7 @@
 
 data_t dot(const DataPoint &lhs, const DataPoint &rhs)
 {
-    double result = 0.0;
+    data_t result = 0.0;
     for (size_t i = 0; i < lhs.size(); ++i)
         result += lhs[i] * rhs[i];
     return result;
@@ -12,6 +12,10 @@ data_t dot(const DataPoint &lhs, const DataPoint &rhs)
 data_t getDistance(const CF_Cluster &cf1, const CF_Cluster &cf2, Distance distance)
 {
     data_t dist = 0;
+
+    if (cf1 == cf2)
+        return dist;
+
     switch(distance)
     {
     case Distance::D0:

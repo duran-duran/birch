@@ -11,6 +11,25 @@ CF_Cluster::CF_Cluster(const DataPoint &point) :
     updateMetrics();
 }
 
+CF_Cluster::CF_Cluster(const CF_Vector &entries) :
+    N(0),
+    SS(0),
+    child(nullptr)
+{
+    if (entries.empty())
+        return;
+
+    LS.resize(entries.front().LS.size());
+    for (size_t i = 0; i < entries.size(); ++i)
+    {
+        N += entries[i].N;
+        LS += entries[i].LS;
+        SS += entries[i].SS;
+    }
+
+    updateMetrics();
+}
+
 CF_Cluster::CF_Cluster(CF_Node *node) :
     N(0),
     SS(0),
@@ -29,6 +48,11 @@ CF_Cluster::CF_Cluster(CF_Node *node) :
     }
 
     updateMetrics();
+}
+
+bool CF_Cluster::operator ==(const CF_Cluster &rhs) const
+{
+    return (N == rhs.N) && std::equal(std::begin(LS), std::end(LS), std::begin(rhs.LS)) && (SS == rhs.SS);
 }
 
 void CF_Cluster::add(const CF_Cluster &entry)
@@ -52,8 +76,8 @@ void CF_Cluster::remove(const CF_Cluster &entry)
 void CF_Cluster::updateMetrics()
 {
     X0 = LS / (data_t)N;
-    R = sqrt((SS - 2 * dot(X0, LS) + N * dot(X0, X0)) / N);
-    D = sqrt(2 * (N * SS - dot(LS, LS)) / (N * (N - 1)));
+    R = (N > 1) ? sqrt((SS - 2 * dot(X0, LS) + N * dot(X0, X0)) / N) : 0; //check to avoid fails due to precision issues
+    D = (N > 1) ? sqrt(2 * (N * SS - dot(LS, LS)) / (N * (N - 1))) : 0;
 }
 
 CF_Vector_it CF_Cluster::findClosest(CF_Vector &clusters) const
