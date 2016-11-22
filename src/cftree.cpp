@@ -69,28 +69,13 @@ CF_Vector CF_Node::splitNode()
     if (subclusters.size() < 2)
         return (root) ? subclusters : CF_Vector{CF_Cluster(this)};
 
-    CF_Vector_it pole1, pole2;
-    data_t longestDist = 0.0;
-
-    for (auto lhs = subclusters.begin(); lhs != subclusters.end() - 1; ++lhs)
-    {
-        for (auto rhs = lhs + 1; rhs != subclusters.end(); ++rhs)
-        {
-            auto distance = getDistance(*lhs, *rhs);
-            if (distance > longestDist)
-            {
-                longestDist = distance;
-                pole1 = lhs;
-                pole2 = rhs;
-            }
-        }
-    }
+    auto poles = CF_Cluster::getTwoFarthest(subclusters);
 
     CF_Vector subclusters1, subclusters2;
 
     for (auto it = subclusters.begin(); it != subclusters.end(); ++it)
     {
-        if (getDistance(*it, *pole1) < getDistance(*it, *pole2))
+        if (getDistance(*it, *poles.first) < getDistance(*it, *poles.second))
             subclusters1.push_back(*it);
         else
             subclusters2.push_back(*it);

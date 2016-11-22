@@ -34,6 +34,9 @@ public:
 
     CF_Vector_it findClosest(CF_Vector& clusters) const;
 
+    static std::pair<CF_Vector_it, CF_Vector_it> getTwoClosest(CF_Vector &clusters);
+    static std::pair<CF_Vector_it, CF_Vector_it> getTwoFarthest(CF_Vector &clusters);
+
 private:
     void updateMetrics();
 };

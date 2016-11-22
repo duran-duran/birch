@@ -97,17 +97,9 @@ data_t CF_TreeBuilder::getMinNewThreshold()
     if (leafEntries.size() < 2)
         return 0;
 
-    data_t closestDist = getDistance(*leafEntries.begin(), *(leafEntries.begin() + 1));
-    for (auto lhs = leafEntries.begin(); lhs != leafEntries.end() - 1; ++lhs)
-    {
-        for (auto rhs = lhs + 1; rhs != leafEntries.end(); ++rhs)
-        {
-            auto distance = getDistance(*lhs, *rhs);
-            if (distance < closestDist)
-                closestDist = distance;
-        }
-    }
-    return closestDist;
+    auto twoClosest = CF_Cluster::getTwoClosest(leafEntries);
+
+    return getDistance(*twoClosest.first, *twoClosest.second);
 }
 
 data_t CF_TreeBuilder::getNewThreshold()

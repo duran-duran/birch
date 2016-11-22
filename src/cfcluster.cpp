@@ -100,3 +100,51 @@ CF_Vector_it CF_Cluster::findClosest(CF_Vector &clusters) const
 
     return closest;
 }
+
+
+std::pair<CF_Vector_it, CF_Vector_it> CF_Cluster::getTwoClosest(CF_Vector &clusters)
+{
+    if (clusters.size() < 2)
+        return std::make_pair(clusters.begin(), clusters.end());
+
+    CF_Vector_it first, second;
+    data_t closestDist = std::numeric_limits<data_t>::max();
+    for (auto lhs = clusters.begin(); lhs != clusters.end() - 1; ++lhs)
+    {
+        for (auto rhs = lhs + 1; rhs != clusters.end(); ++rhs)
+        {
+            auto distance = getDistance(*lhs, *rhs);
+            if (distance < closestDist)
+            {
+                closestDist = distance;
+                first = lhs;
+                second = rhs;
+            }
+        }
+    }
+    return std::make_pair(first, second);
+}
+
+std::pair<CF_Vector_it, CF_Vector_it> CF_Cluster::getTwoFarthest(CF_Vector &clusters)
+{
+    if (clusters.size() < 2)
+        return std::make_pair(clusters.begin(), clusters.end());
+
+    CF_Vector_it first, second;
+    data_t longestDist = 0.0;
+
+    for (auto lhs = clusters.begin(); lhs != clusters.end() - 1; ++lhs)
+    {
+        for (auto rhs = lhs + 1; rhs != clusters.end(); ++rhs)
+        {
+            auto distance = getDistance(*lhs, *rhs);
+            if (distance > longestDist)
+            {
+                longestDist = distance;
+                first = lhs;
+                second = rhs;
+            }
+        }
+    }
+    return std::make_pair(first, second);
+}
