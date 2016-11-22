@@ -9,12 +9,14 @@ class CF_TreeBuilder
 {
 public:
     CF_TreeBuilder(long pointsCnt, int dimensions, size_t branching, data_t initThreshold, size_t maxEntries, size_t trackEach);
+    ~CF_TreeBuilder();
 
     void addPointToTree(const DataPoint &point);
     void rebuildTree();
 
     CF_Node *getTree() const {return tree;}
     const CF_Cluster &getTreeCluster() const {return treeCluster;}
+    CF_Vector getAllLeafEntries();
 private:
     long count;
     int dim;
@@ -28,7 +30,6 @@ private:
     MinSquare<data_t> tFunc, rFunc;
 
     std::vector<CF_Node*> getAllLeafNodes();
-    CF_Vector getAllLeafEntries();
 
     void trackLinRegression();
     data_t getMaxLeafEntryDiameter();

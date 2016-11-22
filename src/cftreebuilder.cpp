@@ -11,12 +11,21 @@ CF_TreeBuilder::CF_TreeBuilder(long pointsCnt, int dimensions, size_t branching,
 {
 }
 
+CF_TreeBuilder::~CF_TreeBuilder()
+{
+    if (tree)
+    {
+        tree->clear();
+        delete tree;
+    }
+}
+
 void CF_TreeBuilder::addPointToTree(const DataPoint &point)
 {
     tree->insert(CF_Cluster(point));
     treeCluster.add(CF_Cluster(point));
 
-    if (treeCluster.N % trackEach == 0 && treeCluster.N != 0)
+    if (treeCluster.N % trackEach == 0)
         trackLinRegression();
     if (leafEntriesCount > maxEntries)
         rebuildTree();
@@ -25,13 +34,14 @@ void CF_TreeBuilder::addPointToTree(const DataPoint &point)
 void CF_TreeBuilder::rebuildTree()
 {
     auto subclusters = getAllLeafEntries();
+    data_t newT = getNewThreshold();
 
     tree->clear();
     delete tree;
 
     leafEntriesCount = 0;
 
-    tree = new CF_Node(getNewThreshold(), branching, &leafEntriesCount);
+    tree = new CF_Node(newT, branching, &leafEntriesCount);
     for (const auto& entry : subclusters)
         tree->insert(entry);
     treeCluster = CF_Cluster(tree);
