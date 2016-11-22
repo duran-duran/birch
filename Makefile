@@ -7,25 +7,25 @@ BUILD_DIR = build
 
 SRCS = $(wildcard $(SRC_DIR)/*.cpp)
 GENERATOR = $(BUILD_DIR)/generator
-CLUSTERIZER = $(BUILD_DIR)/birch
+EXECUTABLE = $(BUILD_DIR)/birch
 
-PROC_NUM = 4
+.PHONY: all debug generator clean 
 
-.PHONY: all clean run
+all: $(EXECUTABLE)
 
-all: $(GENERATOR) $(CLUSTERIZER)
+debug: CPP_FLAGS += -DDEBUG
+debug: $(EXECUTABLE)
+
+generator: $(GENERATOR)
+
+$(EXECUTABLE): $(SRCS) $(BUILD_DIR)
+	$(MPICXX) $(CPP_FLAGS) $(filter-out $(SRC_DIR)/generator.cpp, $(SRCS)) -o $(EXECUTABLE)
 
 $(GENERATOR): $(SRCS) $(BUILD_DIR)
 	$(MPICXX) $(CPP_FLAGS) $(filter-out $(SRC_DIR)/birch.cpp, $(SRCS)) -o $(GENERATOR)
-
-$(CLUSTERIZER): $(SRCS) $(BUILD_DIR)
-	$(MPICXX) $(CPP_FLAGS) $(filter-out $(SRC_DIR)/generator.cpp, $(SRCS)) -o $(CLUSTERIZER)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 clean:
 	rm -r $(BUILD_DIR)
-
-run:
-	mpiexec -np $(PROC_NUM) ./$(CLUSTERIZER)

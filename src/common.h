@@ -12,9 +12,7 @@ extern int rank, procs;
 #include <stdio.h>
 #include <cstdarg>
 
-#define __DEBUG__
-
-#ifdef __DEBUG__
+#ifdef DEBUG
 #define LOG(FMT, ...) logMsg(rank, FMT, __VA_ARGS__)
 #else
 #define LOG(...)
