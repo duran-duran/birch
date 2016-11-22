@@ -1,6 +1,6 @@
 #include "mpi.h"
-#include <vector>
 #include <iostream>
+#include <sstream>
 
 #include "common.h"
 #include "cftree.h"
@@ -11,16 +11,12 @@ int rank = 0,
 #define MPI_DATA_T MPI_DOUBLE
 MPI_Datatype DATA_POINT;
 
-std::string prelog() {
-    return "Process " + std::to_string((long long)rank) + (rank == 0 ? " (Root)" : "") + ": ";
-}
-
-void gotDataPoint(int rank, const DataPoint& point) {
-    std::cout << prelog() << "got data point:";
+void gotDataPoint(const DataPoint& point) {
+    std::stringstream pointSS;
     for (size_t i = 0; i < point.size(); ++i) {
-        std::cout << " " << point[i];
+        pointSS << " " << point[i];
     }
-    std::cout << std::endl;
+    LOG("got data point: %s", pointSS.str().c_str());
 }
 
 void readInputParameters(FILE *pfile, long &count, int &dim);
@@ -64,7 +60,7 @@ void readInputParameters(FILE *pfile, long &count, int &dim) {
     fread(&count, sizeof(count), 1, pfile);
     fread(&dim, sizeof(dim), 1, pfile);
 
-    std::cout << prelog() << "Input data: " << count << " " << dim << "-dimensional data points" << std::endl;
+    LOG("Input data: %ld %d-dimensional data points", count, dim);
 }
 
 void readAndDistributeData(FILE *pfile, long count, int dim) {
@@ -82,7 +78,7 @@ void readAndDistributeData(FILE *pfile, long count, int dim) {
                 &chunk, 1, MPI_INT,
                 0, MPI_COMM_WORLD);
     chunks.clear();
-    std::cout << prelog() << "Expecting " << chunk << " data points" << std::endl;
+    LOG("Expecting %d data_points", chunk);
 
     if (rank == 0) {
         std::vector<DataPoint> buff(procs, DataPoint(dim));
@@ -93,13 +89,13 @@ void readAndDistributeData(FILE *pfile, long count, int dim) {
                 MPI_Waitall(reqCount, &requests[0], MPI_STATUSES_IGNORE);
                 r = reqCount = 0;
             };
-            std::cout << prelog() << "Reading " << i + 1 << " data point.." << std::endl;
+            LOG("Reading %d data point...", i + 1);
             fread(&buff[r][0], point_size, 1, pfile);
             if (r == 0) {
                 DataPoint dataPoint(&buff[r][0], dim);
-                gotDataPoint(rank, dataPoint);
+                gotDataPoint(dataPoint);
             } else if (r < procs) {
-                std::cout << prelog() << "Sending data point to process " << r << std::endl;
+                LOG("Sending data point to process %d", r);
                 MPI_Isend(&buff[r][0], 1, DATA_POINT, r, 0, MPI_COMM_WORLD, &requests[r - 1]);
                 ++reqCount;
             }
@@ -112,7 +108,7 @@ void readAndDistributeData(FILE *pfile, long count, int dim) {
         DataPoint dataPoint(dim);
         for (int i = 0; i < chunk; ++i) {
             MPI_Recv(&dataPoint[0], 1, DATA_POINT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            gotDataPoint(rank, dataPoint);
+            gotDataPoint(dataPoint);
         }
     }
 }
