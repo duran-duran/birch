@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {
     MPI_Type_commit(&DATA_POINT);
 
     auto entries = readAndDistributeData(pfile, count, dim);
+    LOG("Total number of acquired clusters: %d", entries.size());
     if (rank == ROOT) fclose(pfile);
 
     auto clusters = distrKMeans(entries, dim);
@@ -120,6 +121,7 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, int dim)
     if (rank == ROOT)
         k = std::sqrt(entries.size() * procs);
     MPI_Bcast(&k, 1, MPI_INT, ROOT, MPI_COMM_WORLD);
+    LOG("Starting k-means algorithm with k = %d", k);
 
     std::vector<DataPoint> centroidSeeds(k, DataPoint(dim, 0));
     if (rank == ROOT)
@@ -130,7 +132,10 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, int dim)
     }
 
     for (int j = 0; j < k; ++j)
+    {
         MPI_Bcast(&centroidSeeds[j], 1, DATA_POINT, ROOT, MPI_COMM_WORLD);
+        LOG("%dst centroid: %s", j + 1, pointToString(centroidSeeds[j]).c_str());
+    }
 
     CF_Vector centroids;
     for (int j = 0; j < k; ++j)

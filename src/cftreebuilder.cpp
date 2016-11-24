@@ -9,6 +9,14 @@ CF_TreeBuilder::CF_TreeBuilder(long pointsCnt, int dimensions, size_t branching,
     tree(new CF_Node(initThreshold, branching, &leafEntriesCount)),
     treeCluster(tree)
 {
+    LOG("Starting to build cf-tree with following parameters:\n"\
+        "\tTotal points count expected:%ld\n"\
+        "\tData point dimension: %d\n"\
+        "\tBranching factor: %d\n"\
+        "\tInitial threshold: %f\n"\
+        "\tMax number of entries: %d\n"\
+        "\tTracking linear regression each %d points",
+        pointsCnt, dimensions, branching, initThreshold, maxEntries, trackEach);
 }
 
 CF_TreeBuilder::~CF_TreeBuilder()
@@ -24,17 +32,22 @@ void CF_TreeBuilder::addPointToTree(const DataPoint &point)
 {
     tree->insert(CF_Cluster(point));
     treeCluster.add(CF_Cluster(point));
+    LOG("Adding point to tree: %s, total points count - %ld", pointToString(point).c_str(), treeCluster.N);
 
     if (treeCluster.N % trackEach == 0)
         trackLinRegression();
     if (leafEntriesCount > maxEntries)
+    {
+        LOG("Tree overflow, need rebuilding (current number of points - %d, entries - %d", treeCluster.N, leafEntriesCount);
         rebuildTree();
+    }
 }
 
 void CF_TreeBuilder::rebuildTree()
 {
     auto subclusters = getAllLeafEntries();
     data_t newT = getNewThreshold();
+    LOG("New threshold: %f", newT);
 
     tree->clear();
     delete tree;
