@@ -8,6 +8,7 @@ using data_t = double;
 using DataPoint = std::valarray<data_t>;
 
 extern int rank, procs;
+#define ROOT 0
 
 #include <stdio.h>
 #include <cstdarg>

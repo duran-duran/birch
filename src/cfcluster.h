@@ -21,8 +21,6 @@ public:
 
     CF_Node* child;
 
-    std::vector<DataPoint> points;
-
     CF_Cluster(const DataPoint& point);
     CF_Cluster(const CF_Vector& entries);
     CF_Cluster(CF_Node *node);

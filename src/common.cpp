@@ -5,7 +5,7 @@ void logMsg(int r, const char *format, ...)
     va_list args;
     va_start(args, format);
 
-    printf("Process %d%s: ", r, (r == 0) ? " (Root)" : "");
+    printf("Process %d%s: ", r, (r == ROOT) ? " (Root)" : "");
     vprintf(format, args);
     printf("\n");
 
