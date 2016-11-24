@@ -1,6 +1,4 @@
 #include "mpi.h"
-#include <iostream>
-#include <sstream>
 
 #include "common.h"
 #include "metrics.h"
@@ -12,14 +10,6 @@ int rank = 0,
 
 #define MPI_DATA_T MPI_DOUBLE
 MPI_Datatype DATA_POINT;
-
-void gotDataPoint(const DataPoint& point) {
-    std::stringstream pointSS;
-    for (size_t i = 0; i < point.size(); ++i) {
-        pointSS << " " << point[i];
-    }
-    LOG("got data point: %s", pointSS.str().c_str());
-}
 
 void readInputParameters(FILE *pfile, long &count, int &dim);
 CF_Vector readAndDistributeData(FILE *pfile, long count, int dim);

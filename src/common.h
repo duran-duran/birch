@@ -20,6 +20,7 @@ extern int rank, procs;
 #endif
 
 void logMsg(int r, const char *format, ...);
+std::string pointToString(const DataPoint &point);
 
 #endif // __COMMON_H__
 
