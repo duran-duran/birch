@@ -86,7 +86,7 @@ CF_Vector CF_TreeBuilder::getAllLeafEntries()
 void CF_TreeBuilder::trackLinRegression()
 {
     rFunc.addPoint(std::make_pair(treeCluster.N, treeCluster.R));
-    tFunc.addPoint(std::make_pair(treeCluster.N, getMaxLeafEntryDiameter()));
+    vFunc.addPoint(std::make_pair(treeCluster.N, std::pow(getMaxLeafEntryDiameter(), dim)));
 }
 
 data_t CF_TreeBuilder::getMaxLeafEntryDiameter()
@@ -110,7 +110,10 @@ data_t CF_TreeBuilder::getMinNewThreshold()
         for (const auto& entry : node->getSubclusters())
         {
             if (entry.N > maxN)
+            {
+                maxN = entry.N;
                 node = entry.child;
+            }
         }
     }
 
@@ -129,10 +132,12 @@ data_t CF_TreeBuilder::getNewThreshold()
     auto newN = std::min(2 * treeCluster.N, count);
 
     auto expF = std::max(1.0, rFunc.getY(newN) / rFunc.getY(treeCluster.N));
-    auto newT = tFunc.getY(newN);
+    auto newT = std::pow(vFunc.getY(newN), 1.0 / dim);
+//    LOG("New threshold via lin regression: %f", newT);
+//    LOG("Minimal distance between two neighbour entries in tree: %f", getMinNewThreshold());
     newT = std::max(getMinNewThreshold(), expF * newT);
-    if (newT < tFunc.getY(treeCluster.N))
-        newT *= std::pow(newN / treeCluster.N, 1 / dim);
+    if (newT < std::pow(vFunc.getY(treeCluster.N), 1.0 / dim))
+        newT *= std::pow(newN / treeCluster.N, 1.0 / dim);
     return newT;
 }
 

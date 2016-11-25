@@ -27,7 +27,7 @@ private:
     CF_Node *tree;
     CF_Cluster treeCluster;
 
-    MinSquare<data_t> tFunc, rFunc;
+    MinSquare<data_t> vFunc, rFunc;
 
     std::vector<CF_Node*> getAllLeafNodes();
 
