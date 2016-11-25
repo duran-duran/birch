@@ -115,10 +115,12 @@ CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
 
 std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, size_t dim)
 {
-    int k;
-    if (rank == ROOT)
-        k = std::sqrt(entries.size() * procs);
-    MPI_Bcast(&k, 1, MPI_INT, ROOT, MPI_COMM_WORLD);
+    int localEntries = entries.size(),
+        globalEntries = 0;
+    MPI_Allreduce(&localEntries, &globalEntries, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    LOG("Total number of cfs acquired among all processes: %d", globalEntries);
+
+    int k = std::sqrt(globalEntries);
     LOG("Starting k-means algorithm with k = %d", k);
 
     std::vector<DataPoint> centroidSeeds(k, DataPoint((data_t)0, dim));
