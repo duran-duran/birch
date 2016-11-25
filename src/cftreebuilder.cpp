@@ -9,14 +9,13 @@ CF_TreeBuilder::CF_TreeBuilder(long pointsCnt, int dimensions, size_t branching,
     tree(new CF_Node(initThreshold, branching, &leafEntriesCount)),
     treeCluster(tree)
 {
-    LOG("Starting to build cf-tree with following parameters:\n"\
-        "\tTotal points count expected:%ld\n"\
-        "\tData point dimension: %d\n"\
-        "\tBranching factor: %d\n"\
-        "\tInitial threshold: %f\n"\
-        "\tMax number of entries: %d\n"\
-        "\tTracking linear regression each %d points",
-        pointsCnt, dimensions, branching, initThreshold, maxEntries, trackEach);
+    LOG("Starting to build cf-tree with following parameters:");
+    LOG("\tTotal points count expected:%ld", pointsCnt);
+    LOG("\tData point dimension: %d", dimensions);
+    LOG("\tBranching factor: %d", branching);
+    LOG("\tInitial threshold: %f", initThreshold);
+    LOG("\tMax number of entries: %d", maxEntries);
+    LOG("\tTracking linear regression each %d points", trackEach);
 }
 
 CF_TreeBuilder::~CF_TreeBuilder()
@@ -32,7 +31,7 @@ void CF_TreeBuilder::addPointToTree(const DataPoint &point)
 {
     tree->insert(CF_Cluster(point));
     treeCluster.add(CF_Cluster(point));
-    LOG("Adding point to tree: %s, total points count - %ld", pointToString(point).c_str(), treeCluster.N);
+//    LOG("Adding point to tree: %s, total points count - %ld", pointToString(point).c_str(), treeCluster.N);
 
     if (treeCluster.N % trackEach == 0)
         trackLinRegression();

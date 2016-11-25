@@ -14,7 +14,7 @@ extern int rank, procs;
 #include <cstdarg>
 
 #ifdef DEBUG
-#define LOG(FMT, ...) logMsg(rank, FMT, __VA_ARGS__)
+#define LOG(FMT, ...) logMsg(rank, FMT, ##__VA_ARGS__)
 #else
 #define LOG(...)
 #endif

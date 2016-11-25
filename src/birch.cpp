@@ -13,7 +13,7 @@ MPI_Datatype DATA_POINT;
 
 void readInputParameters(FILE *pfile, long &count, int &dim);
 CF_Vector readAndDistributeData(FILE *pfile, long count, int dim);
-std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, int dim);
+std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, size_t dim);
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -48,7 +48,6 @@ int main(int argc, char *argv[]) {
 
     auto clusters = distrKMeans(entries, dim);
 
-    MPI_Type_free(&DATA_POINT);
     MPI_Finalize();
 
     return 0;
@@ -76,7 +75,6 @@ CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
                 &chunk, 1, MPI_INT,
                 ROOT, MPI_COMM_WORLD);
     chunks.clear();
-    LOG("Expecting %d data_points", chunk);
 
     CF_TreeBuilder treeBuilder(chunk, dim, std::log(chunk), 0, std::sqrt(chunk), std::log(chunk));
 
@@ -89,13 +87,13 @@ CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
                 MPI_Waitall(reqCount, &requests[0], MPI_STATUSES_IGNORE);
                 r = reqCount = 0;
             };
-            LOG("Reading %d data point...", i + 1);
+//            LOG("Reading %d data point...", i + 1);
             fread(&buff[r][0], point_size, 1, pfile);
             if (r == 0) {
                 DataPoint dataPoint(&buff[r][0], dim);
                 treeBuilder.addPointToTree(dataPoint);
             } else if (r < procs) {
-                LOG("Sending data point to process %d", r);
+//                LOG("Sending data point to process %d", r);
                 MPI_Isend(&buff[r][0], 1, DATA_POINT, r, 0, MPI_COMM_WORLD, &requests[r - 1]);
                 ++reqCount;
             }
@@ -115,7 +113,7 @@ CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
     return treeBuilder.getAllLeafEntries();
 }
 
-std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, int dim)
+std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, size_t dim)
 {
     int k;
     if (rank == ROOT)
@@ -123,18 +121,22 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, int dim)
     MPI_Bcast(&k, 1, MPI_INT, ROOT, MPI_COMM_WORLD);
     LOG("Starting k-means algorithm with k = %d", k);
 
-    std::vector<DataPoint> centroidSeeds(k, DataPoint(dim, 0));
+    std::vector<DataPoint> centroidSeeds(k, DataPoint((data_t)0, dim));
     if (rank == ROOT)
     {
         auto allData = CF_Cluster(entries);
         for (int j = 0; j < k; ++j)
-            centroidSeeds[j] = DataPoint{(double)rand() / RAND_MAX * allData.R, (double)rand() / RAND_MAX * allData.R} + allData.X0;
+        {
+            centroidSeeds[j] = allData.X0;
+            for (size_t i = 0; i < dim; ++i)
+                centroidSeeds[j][i] += (double)rand() / RAND_MAX * allData.R;
+        }
     }
 
     for (int j = 0; j < k; ++j)
     {
-        MPI_Bcast(&centroidSeeds[j], 1, DATA_POINT, ROOT, MPI_COMM_WORLD);
-        LOG("%dst centroid: %s", j + 1, pointToString(centroidSeeds[j]).c_str());
+        MPI_Bcast(&centroidSeeds[j][0], 1, DATA_POINT, ROOT, MPI_COMM_WORLD);
+        LOG("%d centroid: %s", j + 1, pointToString(centroidSeeds[j]).c_str());
     }
 
     CF_Vector centroids;
@@ -147,7 +149,7 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, int dim)
            newMSE = MSE,
            localMSE;
     std::vector<int> localN(k), globalN(k);
-    std::vector<DataPoint> localSum(k, DataPoint(dim, 0)), globalSum(k, DataPoint(dim, 0));
+    std::vector<DataPoint> localSum(k, DataPoint((data_t)0, dim)), globalSum(k, DataPoint((data_t)0, dim));
     do
     {
         MSE = newMSE;
@@ -155,7 +157,7 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, int dim)
         for (int j = 0; j < k; ++j)
         {
             localN[j] = 0;
-            localSum[j] = DataPoint(dim, 0);
+            localSum[j] = DataPoint((data_t)0, dim);
             clusters[j].clear();
         }
         for (size_t i = 0; i < entries.size(); ++i)
@@ -170,14 +172,17 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, int dim)
             data_t dist = getDistance(entries[i], *closest);
             localMSE += dist*dist;
         }
-        for (size_t j = 0; j < centroids.size(); ++j)
+        for (int j = 0; j < k; ++j)
         {
             MPI_Allreduce(&localN[j], &globalN[j], 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+            LOG("Total number of points in %d cluster: %d", j + 1, globalN[j]);
             MPI_Allreduce(&localSum[j][0], &globalSum[j][0], dim, MPI_DATA_T, MPI_SUM, MPI_COMM_WORLD);
             if (!clusters[j].empty())
                 centroids[j] = CF_Cluster(globalSum[j] / (data_t) globalN[j]);
+            LOG("New %d cluster: %s", j + 1, pointToString(centroids[j].X0).c_str());
         }
         MPI_Allreduce(&localMSE, &newMSE, 1, MPI_DATA_T, MPI_SUM, MPI_COMM_WORLD);
+        LOG("New MSE: %f", newMSE);
     }
     while (newMSE < MSE);
 
