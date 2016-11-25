@@ -177,7 +177,7 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, size_t dim)
             MPI_Allreduce(&localN[j], &globalN[j], 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
             LOG("Total number of points in %d cluster: %d", j + 1, globalN[j]);
             MPI_Allreduce(&localSum[j][0], &globalSum[j][0], dim, MPI_DATA_T, MPI_SUM, MPI_COMM_WORLD);
-            if (!clusters[j].empty())
+            if (globalN[j] != 0)
                 centroids[j] = CF_Cluster(globalSum[j] / (data_t) globalN[j]);
             LOG("New %d cluster: %s", j + 1, pointToString(centroids[j].X0).c_str());
         }
