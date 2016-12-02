@@ -52,7 +52,14 @@ CF_Cluster::CF_Cluster(CF_Node *node) :
 
 bool CF_Cluster::operator ==(const CF_Cluster &rhs) const
 {
-    return (N == rhs.N) && std::equal(std::begin(LS), std::end(LS), std::begin(rhs.LS)) && (SS == rhs.SS);
+    bool equal = true;
+    for (size_t i = 0; i < LS.size(); ++i)
+    {
+        equal = LS[i] == rhs.LS[i];
+        if (!equal) break;
+    }
+
+    return (N == rhs.N) && (SS == rhs.SS) && equal /*std::equal(std::begin(LS), std::end(LS), std::begin(rhs.LS))*/; //replaced for intel cxx compiler support
 }
 
 void CF_Cluster::add(const CF_Cluster &entry)

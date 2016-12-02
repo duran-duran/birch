@@ -3,6 +3,9 @@
 
 #include <vector>
 #include <valarray>
+#include <string>
+#include <limits>
+#include <iterator>
 
 using data_t = double;
 using DataPoint = std::valarray<data_t>;
