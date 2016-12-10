@@ -82,7 +82,11 @@ void CF_Cluster::remove(const CF_Cluster &entry)
 
 void CF_Cluster::updateMetrics()
 {
-    X0 = LS / (data_t)N;
+    X0.resize(LS.size());
+    for (size_t i = 0; i < X0.size(); ++i)
+        X0[i] = LS[i] / (data_t) N;
+//    X0 = LS / (data_t) N; //replaced for intel cxx compiler support
+
     R = (N > 1) ? sqrt((SS - 2 * dot(X0, LS) + N * dot(X0, X0)) / N) : 0; //check to avoid fails due to precision issues
     D = (N > 1) ? sqrt(2 * (N * SS - dot(LS, LS)) / (N * (N - 1))) : 0;
 }
