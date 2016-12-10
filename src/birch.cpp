@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
             std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             LOG_DEBUG("Total elapsed time: %ldms", elapsed.count());
 
-            LOG("%d %d %d", procs, count, elapsed);
+            LOG("%d %d %d", procs, count, elapsed.count());
         }
     }
 
