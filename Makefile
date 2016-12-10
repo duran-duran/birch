@@ -19,7 +19,7 @@ debug: $(EXECUTABLE)
 generator: $(GENERATOR)
 
 $(EXECUTABLE): $(SRCS) $(BUILD_DIR)
-	$(MPICXX) $(CPP_FLAGS) $(filter-out $(SRC_DIR)/generator.cpp, $(SRCS)) -o $(EXECUTABLE)
+	$(MPICXX) $(CPP_FLAGS) $(filter-out $(wildcard $(SRC_DIR)/*generator.cpp), $(SRCS)) -o $(EXECUTABLE)
 
 $(GENERATOR): $(SRCS) $(BUILD_DIR)
 	$(MPICXX) $(CPP_FLAGS) $(filter-out $(SRC_DIR)/birch.cpp, $(SRCS)) -o $(GENERATOR)
