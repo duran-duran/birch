@@ -12,8 +12,8 @@ int rank = 0,
 #define MPI_DATA_T MPI_DOUBLE
 MPI_Datatype DATA_POINT;
 
-void readInputParameters(FILE *pfile, long &count, int &dim);
-CF_Vector readAndDistributeData(FILE *pfile, long count, int dim);
+DataPoint generateDataPoint(size_t dim, data_t min, data_t max);
+CF_Vector generateAndDistributeData(int count, int dim, data_t min, data_t max);
 std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, size_t dim);
 
 int main(int argc, char *argv[]) {
@@ -22,44 +22,63 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &procs);
 
-    if (rank == ROOT) LOG("Total number of processes: %d", procs);
+    if (rank == ROOT) LOG_DEBUG("Total number of processes: %d", procs);
 
     srand(time(NULL));
 
-    long count;
     int dim;
-    FILE *pfile;
+    data_t min, max;
+    int start, finish;
+    int expCnt;
 
     if (rank == ROOT) {
-        if (argc < 2) {
-            std::cout << "Usage:" << std::endl;
-            std::cout << "\tbirch <input_file> <output_file>" << std::endl;
+        if (argc < 7) {
+            LOG("Usage:");
+            LOG("\tbirch <dimensions> <min> <max> <points_start> <points_finish> <experiments_count>");
             return 1;
         }
-        char *filename = argv[1];
-        pfile = fopen(filename, "rb");
-        readInputParameters(pfile, count, dim);
+
+        dim = atoi(argv[1]);
+        min = atof(argv[2]);
+        max = atof(argv[3]);
+        start = atoi(argv[4]);
+        finish = atoi(argv[5]);
+        expCnt = atoi(argv[6]);
+
+        LOG_DEBUG("Input parameters:");
+        LOG_DEBUG("%d-dimensional data points from [%f, %f]", dim, min, max);
+        LOG_DEBUG("%d experiments from %d points to %ld points", expCnt, start, finish);
     }
 
     MPI_Bcast(&dim, 1, MPI_INT, ROOT, MPI_COMM_WORLD);
+    MPI_Bcast(&min, 1, MPI_DATA_T, ROOT, MPI_COMM_WORLD);
+    MPI_Bcast(&max, 1, MPI_DATA_T, ROOT, MPI_COMM_WORLD);
+    MPI_Bcast(&expCnt, 1, MPI_INT, ROOT, MPI_COMM_WORLD);
+
     MPI_Type_contiguous(dim, MPI_DATA_T, &DATA_POINT);
     MPI_Type_commit(&DATA_POINT);
 
-    std::chrono::time_point<std::chrono::system_clock> start, end;
+    std::chrono::time_point<std::chrono::system_clock> begin, end;
 
-    if (rank == ROOT) start = std::chrono::system_clock::now();
-
-    auto entries = readAndDistributeData(pfile, count, dim);
-    LOG_DEBUG("Total number of acquired clusters: %d", entries.size());
-    if (rank == ROOT) fclose(pfile);
-
-    auto clusters = distrKMeans(entries, dim);
-
-    if (rank == ROOT)
+    for (int i = 0; i < expCnt; ++i)
     {
-        end = std::chrono::system_clock::now();
-        std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        LOG("Total elapsed time: %ldms", elapsed.count());
+        LOG_DEBUG("Starting %d experiment..", i + 1);
+
+        if (rank == ROOT) begin = std::chrono::system_clock::now();
+
+        int count = (expCnt > 1) ? (start + (finish - start) * i / (expCnt - 1)) : start;
+        auto entries = generateAndDistributeData(count, dim, min, max);
+        LOG_DEBUG("Total number of acquired clusters: %d", entries.size());
+        auto clusters = distrKMeans(entries, dim);
+
+        if (rank == ROOT)
+        {
+            end = std::chrono::system_clock::now();
+            std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+            LOG_DEBUG("Total elapsed time: %ldms", elapsed.count());
+
+            LOG("%d %d %d", procs, count, elapsed);
+        }
     }
 
     MPI_Finalize();
@@ -67,16 +86,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-void readInputParameters(FILE *pfile, long &count, int &dim) {
-    fread(&count, sizeof(count), 1, pfile);
-    fread(&dim, sizeof(dim), 1, pfile);
-
-    LOG("Input data: %ld %d-dimensional data points", count, dim);
-}
-
-CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
-    const int point_size = sizeof(data_t) * dim;
-
+CF_Vector generateAndDistributeData(int count, int dim, data_t min, data_t max) {
     std::vector<int> chunks(procs);
     if (rank == ROOT) {
         for (int r = 0; r < procs; ++r) {
@@ -102,7 +112,7 @@ CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
                 r = reqCount = 0;
             };
 //            LOG_DEBUG("Reading %d data point...", i + 1);
-            fread(&buff[r][0], point_size, 1, pfile);
+            buff[r] = generateDataPoint(dim, min, max);
             if (r == 0) {
                 DataPoint dataPoint(&buff[r][0], dim);
                 treeBuilder.addPointToTree(dataPoint);
@@ -203,4 +213,12 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, size_t dim)
     while (newMSE < MSE);
 
     return clusters;
+}
+
+DataPoint generateDataPoint(size_t dim, data_t min, data_t max)
+{
+    DataPoint point((data_t) 0, dim);
+    for (size_t i = 0; i < dim; ++i)
+        point[i] = ((data_t) rand() / RAND_MAX) * (max - min) + min;
+    return point;
 }
