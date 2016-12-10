@@ -10,7 +10,6 @@ int rank = 0,
     procs = 1;
 
 #define MPI_DATA_T MPI_DOUBLE
-MPI_Datatype DATA_POINT;
 
 void readInputParameters(FILE *pfile, long &count, int &dim);
 CF_Vector readAndDistributeData(FILE *pfile, long count, int dim);
@@ -22,44 +21,48 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &procs);
 
-    if (rank == ROOT) LOG("Total number of processes: %d", procs);
-
     srand(time(NULL));
-
-    long count;
-    int dim;
-    FILE *pfile;
 
     if (rank == ROOT) {
         if (argc < 2) {
-            std::cout << "Usage:" << std::endl;
-            std::cout << "\tbirch <input_file> <output_file>" << std::endl;
+            LOG("Usage:");
+            LOG("\tbirch <input_files...>");
             return 1;
         }
-        char *filename = argv[1];
-        pfile = fopen(filename, "rb");
-        readInputParameters(pfile, count, dim);
     }
 
-    MPI_Bcast(&dim, 1, MPI_INT, ROOT, MPI_COMM_WORLD);
-    MPI_Type_contiguous(dim, MPI_DATA_T, &DATA_POINT);
-    MPI_Type_commit(&DATA_POINT);
+    if (rank == ROOT) LOG_DEBUG("Total number of processes: %d", procs);
 
-    std::chrono::time_point<std::chrono::system_clock> start, end;
+    int dim;
+    long count;
+    FILE *pfile;
 
-    if (rank == ROOT) start = std::chrono::system_clock::now();
-
-    auto entries = readAndDistributeData(pfile, count, dim);
-    LOG_DEBUG("Total number of acquired clusters: %d", entries.size());
-    if (rank == ROOT) fclose(pfile);
-
-    auto clusters = distrKMeans(entries, dim);
-
-    if (rank == ROOT)
+    for (int i = 1; i < argc; ++i)
     {
-        end = std::chrono::system_clock::now();
-        std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        LOG("Total elapsed time: %ldms", elapsed.count());
+        if (rank == ROOT) {
+            char *filename = argv[i];
+            pfile = fopen(filename, "rb");
+            readInputParameters(pfile, count, dim);
+        }
+        MPI_Bcast(&dim, 1, MPI_INT, ROOT, MPI_COMM_WORLD);
+
+        std::chrono::time_point<std::chrono::system_clock> start, end;
+
+        if (rank == ROOT) start = std::chrono::system_clock::now();
+
+        auto entries = readAndDistributeData(pfile, count, dim);
+        LOG_DEBUG("Total number of acquired clusters: %d", entries.size());
+        if (rank == ROOT) fclose(pfile);
+        auto clusters = distrKMeans(entries, dim);
+
+        if (rank == ROOT)
+        {
+            end = std::chrono::system_clock::now();
+            std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            LOG_DEBUG("Total elapsed time: %ldms", elapsed.count());
+
+            LOG("%d %d %d", procs, count, elapsed);
+        }
     }
 
     MPI_Finalize();
@@ -71,7 +74,7 @@ void readInputParameters(FILE *pfile, long &count, int &dim) {
     fread(&count, sizeof(count), 1, pfile);
     fread(&dim, sizeof(dim), 1, pfile);
 
-    LOG("Input data: %ld %d-dimensional data points", count, dim);
+    LOG_DEBUG("Input data: %ld %d-dimensional data points", count, dim);
 }
 
 CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
@@ -108,7 +111,7 @@ CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
                 treeBuilder.addPointToTree(dataPoint);
             } else if (r < procs) {
 //                LOG_DEBUG("Sending data point to process %d", r);
-                MPI_Isend(&buff[r][0], 1, DATA_POINT, r, 0, MPI_COMM_WORLD, &requests[r - 1]);
+                MPI_Isend(&buff[r][0], dim, MPI_DATA_T, r, 0, MPI_COMM_WORLD, &requests[r - 1]);
                 ++reqCount;
             }
         }
@@ -119,7 +122,7 @@ CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
     } else {
         DataPoint dataPoint(dim);
         for (int i = 0; i < chunk; ++i) {
-            MPI_Recv(&dataPoint[0], 1, DATA_POINT, ROOT, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&dataPoint[0], dim, MPI_DATA_T, ROOT, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             treeBuilder.addPointToTree(dataPoint);
         }
     }
@@ -151,7 +154,7 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, size_t dim)
 
     for (int j = 0; j < k; ++j)
     {
-        MPI_Bcast(&centroidSeeds[j][0], 1, DATA_POINT, ROOT, MPI_COMM_WORLD);
+        MPI_Bcast(&centroidSeeds[j][0], dim, MPI_DATA_T, ROOT, MPI_COMM_WORLD);
         LOG_DEBUG("%d centroid: %s", j + 1, pointToString(centroidSeeds[j]).c_str());
     }
 
