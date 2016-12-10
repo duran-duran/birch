@@ -1,3 +1,4 @@
+#include <chrono>
 #include "mpi.h"
 
 #include "common.h"
@@ -21,6 +22,8 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &procs);
 
+    if (rank == ROOT) LOG("Total number of processes: %d", procs);
+
     srand(time(NULL));
 
     long count;
@@ -42,11 +45,22 @@ int main(int argc, char *argv[]) {
     MPI_Type_contiguous(dim, MPI_DATA_T, &DATA_POINT);
     MPI_Type_commit(&DATA_POINT);
 
+    std::chrono::time_point<std::chrono::system_clock> start, end;
+
+    if (rank == ROOT) start = std::chrono::system_clock::now();
+
     auto entries = readAndDistributeData(pfile, count, dim);
     LOG_DEBUG("Total number of acquired clusters: %d", entries.size());
     if (rank == ROOT) fclose(pfile);
 
     auto clusters = distrKMeans(entries, dim);
+
+    if (rank == ROOT)
+    {
+        end = std::chrono::system_clock::now();
+        std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        LOG("Total elapsed time: %ldms", elapsed.count());
+    }
 
     MPI_Finalize();
 
@@ -57,7 +71,7 @@ void readInputParameters(FILE *pfile, long &count, int &dim) {
     fread(&count, sizeof(count), 1, pfile);
     fread(&dim, sizeof(dim), 1, pfile);
 
-    LOG_DEBUG("Input data: %ld %d-dimensional data points", count, dim);
+    LOG("Input data: %ld %d-dimensional data points", count, dim);
 }
 
 CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
