@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
     MPI_Type_commit(&DATA_POINT);
 
     auto entries = readAndDistributeData(pfile, count, dim);
-    LOG("Total number of acquired clusters: %d", entries.size());
+    LOG_DEBUG("Total number of acquired clusters: %d", entries.size());
     if (rank == ROOT) fclose(pfile);
 
     auto clusters = distrKMeans(entries, dim);
@@ -57,7 +57,7 @@ void readInputParameters(FILE *pfile, long &count, int &dim) {
     fread(&count, sizeof(count), 1, pfile);
     fread(&dim, sizeof(dim), 1, pfile);
 
-    LOG("Input data: %ld %d-dimensional data points", count, dim);
+    LOG_DEBUG("Input data: %ld %d-dimensional data points", count, dim);
 }
 
 CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
@@ -87,13 +87,13 @@ CF_Vector readAndDistributeData(FILE *pfile, long count, int dim) {
                 MPI_Waitall(reqCount, &requests[0], MPI_STATUSES_IGNORE);
                 r = reqCount = 0;
             };
-//            LOG("Reading %d data point...", i + 1);
+//            LOG_DEBUG("Reading %d data point...", i + 1);
             fread(&buff[r][0], point_size, 1, pfile);
             if (r == 0) {
                 DataPoint dataPoint(&buff[r][0], dim);
                 treeBuilder.addPointToTree(dataPoint);
             } else if (r < procs) {
-//                LOG("Sending data point to process %d", r);
+//                LOG_DEBUG("Sending data point to process %d", r);
                 MPI_Isend(&buff[r][0], 1, DATA_POINT, r, 0, MPI_COMM_WORLD, &requests[r - 1]);
                 ++reqCount;
             }
@@ -118,10 +118,10 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, size_t dim)
     int localEntries = entries.size(),
         globalEntries = 0;
     MPI_Allreduce(&localEntries, &globalEntries, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-    LOG("Total number of cfs acquired among all processes: %d", globalEntries);
+    LOG_DEBUG("Total number of cfs acquired among all processes: %d", globalEntries);
 
     int k = std::sqrt(globalEntries);
-    LOG("Starting k-means algorithm with k = %d", k);
+    LOG_DEBUG("Starting k-means algorithm with k = %d", k);
 
     std::vector<DataPoint> centroidSeeds(k, DataPoint((data_t)0, dim));
     if (rank == ROOT)
@@ -138,7 +138,7 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, size_t dim)
     for (int j = 0; j < k; ++j)
     {
         MPI_Bcast(&centroidSeeds[j][0], 1, DATA_POINT, ROOT, MPI_COMM_WORLD);
-        LOG("%d centroid: %s", j + 1, pointToString(centroidSeeds[j]).c_str());
+        LOG_DEBUG("%d centroid: %s", j + 1, pointToString(centroidSeeds[j]).c_str());
     }
 
     CF_Vector centroids;
@@ -177,14 +177,14 @@ std::vector<CF_Vector> distrKMeans(const CF_Vector &entries, size_t dim)
         for (int j = 0; j < k; ++j)
         {
             MPI_Allreduce(&localN[j], &globalN[j], 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-//            LOG("Total number of points in %d cluster: %d", j + 1, globalN[j]);
+//            LOG_DEBUG("Total number of points in %d cluster: %d", j + 1, globalN[j]);
             MPI_Allreduce(&localSum[j][0], &globalSum[j][0], dim, MPI_DATA_T, MPI_SUM, MPI_COMM_WORLD);
             if (globalN[j] != 0)
                 centroids[j] = CF_Cluster(globalSum[j] / (data_t) globalN[j]);
-//            LOG("New %d cluster: %s", j + 1, pointToString(centroids[j].X0).c_str());
+//            LOG_DEBUG("New %d cluster: %s", j + 1, pointToString(centroids[j].X0).c_str());
         }
         MPI_Allreduce(&localMSE, &newMSE, 1, MPI_DATA_T, MPI_SUM, MPI_COMM_WORLD);
-        LOG("New MSE: %f", newMSE);
+        LOG_DEBUG("New MSE: %f", newMSE);
     }
     while (newMSE < MSE);
 
